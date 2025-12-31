@@ -17,9 +17,6 @@
 import callService from '../../../core/api/api-call';
 import actionUtils from '../../../core/common/action-utils';
 
-// action helpers
-
-
 
 // thunks
 export function init({lang}) {

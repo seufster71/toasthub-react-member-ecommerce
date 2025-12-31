@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020 The ToastHub Project
+ * Copyright (C) 2016 The ToastHub Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,47 +13,52 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 import callService from '../../../core/api/api-call';
 import actionUtils from '../../../core/common/action-utils';
+
+// action helpers
+
 
 
 // thunks
 export function init({parent,parentType}) {
 	return function(dispatch) {
 		let requestParams = {};
-    	requestParams.action = "INIT";
-		requestParams.service = "EC_STORE_SVC";
-		requestParams.prefTextKeys = new Array("EC_STORE_PAGE");
-		requestParams.prefLabelKeys = new Array("EC_STORE_PAGE");
+		requestParams.action = "INIT";
+		requestParams.service = "EC_MEMBER_SVC";
+		if (parentType != null) {
+			requestParams.parentType = parentType;
+		}
+		requestParams.prefTextKeys = new Array("EC_MEMBER_PAGE");
+		requestParams.prefLabelKeys = new Array("EC_MEMBER_PAGE");
 		if (parent != null) {
 			requestParams.parentId = parent.id;
-			dispatch({type:"EC_STORE_ADD_PARENT", parent});
+			dispatch({type:"EC_MEMBER_ADD_PARENT", parent, parentType});
 		} else {
-			dispatch({type:"EC_STORE_CLEAR_PARENT"});
+			dispatch({type:"EC_MEMBER_CLEAR_PARENT"});
 		}
-    	let params = {};
-    	params.requestParams = requestParams;
-    	params.URI = '/api/member/callService';
+		let params = {};
+		params.requestParams = requestParams;
+		params.URI = '/api/member/callService';
 
-    	return callService(params).then( (responseJson) => {
-      		if (responseJson != null && responseJson.protocalError == null){
-				dispatch({ type: "EC_STORE_INIT", responseJson });
+		return callService(params).then( (responseJson) => {
+			if (responseJson != null && responseJson.protocalError == null){
+				dispatch({ type: "EC_MEMBER_INIT", responseJson });
 			} else {
 				actionUtils.checkConnectivity(responseJson,dispatch);
 			}
-    	}).catch(error => {
-      		throw(error);
-    	});
+		}).catch(error => {
+			throw(error);
+		});
 
-  	};
+	};
 }
 
 export function list({state,listStart,listLimit,searchCriteria,orderCriteria,info,paginationSegment}) {
 	return function(dispatch) {
 		let requestParams = {};
 		requestParams.action = "LIST";
-		requestParams.service = "EC_STORE_SVC";
+		requestParams.service = "EC_MEMBER_SVC";
 		if (listStart != null) {
 			requestParams.listStart = listStart;
 		} else {
@@ -75,17 +80,17 @@ export function list({state,listStart,listLimit,searchCriteria,orderCriteria,inf
 			requestParams.orderCriteria = state.orderCriteria;
 		}
 		if (state.parent != null) {
-			requestParams.productId = state.parent.id;
+			requestParams.parentId = state.parent.id;
 		}
-		let userPrefChange = {"page":"users","orderCriteria":requestParams.orderCriteria,"listStart":requestParams.listStart,"listLimit":requestParams.listLimit};
-		dispatch({type:"EC_STORE_PREF_CHANGE", userPrefChange});
+		let prefChange = {"page":"roles","orderCriteria":requestParams.orderCriteria,"listStart":requestParams.listStart,"listLimit":requestParams.listLimit};
+		dispatch({type:"EC_MEMBER_PREF_CHANGE", prefChange});
 		let params = {};
 		params.requestParams = requestParams;
 		params.URI = '/api/member/callService';
 
 		return callService(params).then( (responseJson) => {
 			if (responseJson != null && responseJson.protocalError == null){
-				dispatch({ type: "EC_STORE_LIST", responseJson, paginationSegment });
+				dispatch({ type: "EC_MEMBER_LIST", responseJson, paginationSegment });
 				if (info != null) {
 		        	  dispatch({type:'SHOW_STATUS',info:info});  
 		        }
@@ -101,14 +106,14 @@ export function list({state,listStart,listLimit,searchCriteria,orderCriteria,inf
 
 export function listLimit({state,listLimit}) {
 	return function(dispatch) {
-		 dispatch({ type:"EC_STORE_LISTLIMIT",listLimit});
+		 dispatch({ type:"EC_MEMBER_LISTLIMIT",listLimit});
 		 dispatch(list({state,listLimit}));
 	 };
 }
 
 export function search({state,searchCriteria}) {
 	return function(dispatch) {
-		 dispatch({ type:"EC_STORE_SEARCH",searchCriteria});
+		 dispatch({ type:"EC_MEMBER_SEARCH",searchCriteria});
 		 dispatch(list({state,searchCriteria,listStart:0}));
 	 };
 }
@@ -118,7 +123,7 @@ export function searchChange({field,value}) {
 		 let params = {};
 		 params.field = field;
 		 params.value = value;
-		 dispatch({ type:"EC_STORE_SEARCH_CHANGE",params});
+		 dispatch({ type:"EC_MEMBER_SEARCH_CHANGE",params});
 	 };
 }
 
@@ -126,11 +131,10 @@ export function saveItem({state}) {
 	return function(dispatch) {
 		let requestParams = {};
 	    requestParams.action = "SAVE";
-	    requestParams.service = "EC_STORE_SVC";
+	    requestParams.service = "EC_MEMBER_SVC";
 	    requestParams.inputFields = state.inputFields;
-	    if (state.parent != null) {
-	    	requestParams.productId = state.parent.id;
-	    }
+	    requestParams.parentId = state.parent.id;
+
 	    let params = {};
 	    params.requestParams = requestParams;
 	    params.URI = '/api/member/callService';
@@ -138,7 +142,7 @@ export function saveItem({state}) {
 	    return callService(params).then( (responseJson) => {
 	    	if (responseJson != null && responseJson.protocalError == null){
 	    		if(responseJson != null && responseJson.status != null && responseJson.status == "SUCCESS"){  
-	    			dispatch(list({state,info:["Save Successful"]}));
+	    			dispatch(list({state,info:responseJson.infos}));
 	    		} else if (responseJson != null && responseJson.status != null && responseJson.status == "ACTIONFAILED") {
 	    			dispatch({type:'SHOW_STATUS',error:responseJson.errors});
 	    		}
@@ -156,7 +160,7 @@ export function deleteItem({state,id}) {
 	return function(dispatch) {
 	    let requestParams = {};
 	    requestParams.action = "DELETE";
-	    requestParams.service = "EC_STORE_SVC";
+	    requestParams.service = "EC_MEMBER_SVC";
 	    requestParams.itemId = id;
 	    
 	    let params = {};
@@ -166,10 +170,10 @@ export function deleteItem({state,id}) {
 	    return callService(params).then( (responseJson) => {
 	    	if (responseJson != null && responseJson.protocalError == null){
 	    		if(responseJson != null && responseJson.status != null && responseJson.status == "SUCCESS"){  
-	    			dispatch(list({state,info:["Delete Successful"]}));
+	    			dispatch(list({state,info:responseJson.infos}));
 	    		} else if (responseJson != null && responseJson.status != null && responseJson.status == "ACTIONFAILED") {
 	    			dispatch({type:'SHOW_STATUS',warn:responseJson.errors});
-	    		}
+	    		}	
 	    	} else {
 	    		actionUtils.checkConnectivity(responseJson,dispatch);
 	    	}
@@ -179,13 +183,12 @@ export function deleteItem({state,id}) {
 	};
 }
 
-
-export function modifyItem({id,appPrefs}) {
+export function modifyItem({id, appPrefs}) {
 	return function(dispatch) {
 	    let requestParams = {};
 	    requestParams.action = "ITEM";
-	    requestParams.service = "EC_STORE_SVC";
-	    requestParams.prefFormKeys = new Array("EC_STORE_FORM");
+	    requestParams.service = "EC_MEMBER_SVC";
+	    requestParams.prefFormKeys = new Array("EC_MEMBER_FORM");
 	    if (id != null) {
 	    	requestParams.itemId = id;
 	    }
@@ -195,7 +198,7 @@ export function modifyItem({id,appPrefs}) {
 
 	    return callService(params).then( (responseJson) => {
 	    	if (responseJson != null && responseJson.protocalError == null){
-	    		dispatch({ type: 'EC_STORE_ITEM',responseJson,appPrefs});
+	    		dispatch({ type: 'EC_MEMBER_ITEM',responseJson, appPrefs});
 	    	} else {
 	    		actionUtils.checkConnectivity(responseJson,dispatch);
 	    	}
@@ -210,52 +213,111 @@ export function inputChange(field,value) {
 		 let params = {};
 		 params.field = field;
 		 params.value = value;
-		 dispatch({ type:"EC_STORE_INPUT_CHANGE",params});
+		 dispatch({ type:"EC_MEMBER_INPUT_CHANGE",params});
+	 };
+}
+
+export function selectChange({field,value}) {
+	return function(dispatch) {
+		let params = {};
+		params.field = field;
+		if ( typeof field === 'object' && field.name != null) {
+			params.field = field.name;
+		}
+		params.value = value;
+		dispatch({ type:"EC_MEMBER_SELECT_CHANGE",params});
+	 };
+}
+
+export function selectClick({field,value}) {
+	return function(dispatch) {
+		let params = {};
+		params.field = field;
+		params.value = value;
+		dispatch({ type:"EC_MEMBER_SELECT_CLICK",params});
+	 };
+}
+
+export function selectListUpdate({field,value}) {
+	return function(dispatch) {
+		let requestParams = {};
+	    requestParams.action = "SELECTLIST";
+	    requestParams.service = "EC_MEMBER_SVC";
+	    requestParams.fieldName = field.name;
+	    requestParams.searchValue = value;
+	    let params = {};
+	    params.requestParams = requestParams;
+	    params.URI = '/api/member/callService';
+
+	    return callService(params).then( (responseJson) => {
+	    	if (responseJson != null && responseJson.protocalError == null){
+	    		dispatch({ type: 'EC_MEMBER_SELECT_LIST',responseJson});
+	    	} else {
+	    		actionUtils.checkConnectivity(responseJson,dispatch);
+	    	}
+	    }).catch(error => {
+	    	throw(error);
+	    });
 	 };
 }
 
 export function orderBy({state,orderCriteria}) {
 	 return function(dispatch) {
-		 dispatch({ type:"EC_STORE_ORDERBY",orderCriteria});
+		 dispatch({ type:"EC_MEMBER_ORDERBY",orderCriteria});
 		 dispatch(list({state,orderCriteria}));
 	 };
 }
 
-export function clearItem() {
+export function clearRole() {
 	return function(dispatch) {
-		dispatch({ type:"EC_STORE_CLEAR_ITEM"});
+		dispatch({ type:"EC_MEMBER_CLEAR_ROLE"});
 	};
 }
 
-export function clearField(field) {
-	return function(dispatch) {
-		let params = {};
-		 params.field = field;
-		dispatch({ type:"EC_STORE_CLEAR_FIELD",params});
-	};
-}
-
-export function setStatus({successes,errors}) {
+export function setErrors({errors}) {
 	 return function(dispatch) {
-		 dispatch({ type:"EC_STORE_SET_STATUS",successes,errors});
+		 dispatch({ type:"EC_MEMBER_SET_ERRORS",errors});
 	 };
 }
 
 export function openDeleteModal({item}) {
 	 return function(dispatch) {
-		 dispatch({type:"EC_STORE_OPEN_DELETE_MODAL",item});
+		 dispatch({type:"EC_MEMBER_OPEN_DELETE_MODAL",item});
 	 };
 }
 
 export function closeDeleteModal() {
 	 return function(dispatch) {
-		 dispatch({type:"EC_STORE_CLOSE_DELETE_MODAL"});
+		 dispatch({type:"EC_MEMBER_CLOSE_DELETE_MODAL"});
 	 };
 }
 
 export function cancel({state}) {
 	return function(dispatch) {
-		dispatch({type:"EC_STORE_CANCEL"});
+		dispatch({type:"EC_MEMBER_CANCEL"});
 		dispatch(list({state}));
+	 };
+}
+
+export function getDefaultOptions({field,item}) {
+	return function(dispatch) {
+		let requestParams = {};
+	    requestParams.action = "SELECTLIST";
+	    requestParams.service = "EC_MEMBER_SVC";
+	    requestParams.fieldName = field;
+	    requestParams.searchValue = item.username;
+	    let params = {};
+	    params.requestParams = requestParams;
+	    params.URI = '/api/member/callService';
+
+	    return callService(params).then( (responseJson) => {
+	    	if (responseJson != null && responseJson.protocalError == null){
+	    		dispatch({ type: 'EC_MEMBER_SELECT_LIST',responseJson});
+	    	} else {
+	    		actionUtils.checkConnectivity(responseJson,dispatch);
+	    	}
+	    }).catch(error => {
+	    	throw(error);
+	    });
 	 };
 }

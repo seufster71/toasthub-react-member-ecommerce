@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020 The ToastHub Project
+ * Copyright (C) 2016 The ToastHub Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,14 +16,17 @@
 'use-strict';
 import React, { useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import * as actions from './store-actions';
+import * as actions from './team-actions';
 import fuLogger from '../../../core/common/fu-logger';
-import ECStoreView from '../../../memberView/ecommerce/store/store-view';
-import ECStoreModifyView from '../../../memberView/ecommerce/store/store-modify-view';
+import ECTeamView from '../../../memberView/ec/team/team-view';
+import ECTeamModifyView from '../../../memberView/ec/team/team-modify-view';
+import ECTeamLinkModifyView from '../../../memberView/ec/team/team-link-modify-view';
+import utils from '../../../core/common/utils';
 import BaseContainer from '../../../core/container/base-container';
 
-function ECStoreContainer({location,navigate}) {
-	const itemState = useSelector((state) => state.ecstore);
+
+function ECTeamContainer({location,navigate}) {
+	const itemState = useSelector((state) => state.pmteam);
 	const session = useSelector((state) => state.session);
 	const appPrefs = useSelector((state) => state.appPrefs);
 	const dispatch = useDispatch();
@@ -43,7 +46,7 @@ function ECStoreContainer({location,navigate}) {
 		BaseContainer.onPaginationClick({state:itemState,actions:actions,dispatch:dispatch,value});
 	}
 	const onSearchChange = (field,event) => {
-		BaseContainer.onSearchChange({state:itemState,actions:actions,dispatch:dispatch,appPrefs:appPrefs,field,event});
+		BaseContainer.onSearchChange({state:itemState,actions:actions,dispatch:dispatchEC_ROLE,field,event});
 	}
 	const onSearchClick = (field,event) => {
 		BaseContainer.onSearchClick({state:itemState,actions:actions,dispatch:dispatch,field,event});
@@ -55,7 +58,7 @@ function ECStoreContainer({location,navigate}) {
 		BaseContainer.onOrderBy({state:itemState,actions:actions,dispatch:dispatch,appPrefs:appPrefs,field,event});
 	}
 	const onSave = () => {
-		BaseContainer.onSave({state:itemState,actions:actions,dispatch:dispatch,appPrefs:appPrefs,form:"EC_STORE_FORM"});
+		BaseContainer.onSave({state:itemState,actions:actions,dispatch:dispatch,appPrefs:appPrefs,form:"EC_TEAM_FORM"});
 	}
 	const closeModal = () => {
 		BaseContainer.closeModal({actions:actions,dispatch:dispatch});
@@ -66,33 +69,68 @@ function ECStoreContainer({location,navigate}) {
 	const goBack = () => {
 		BaseContainer.goBack({navigate});
 	}
-	const onBlur = (field) => {
-		BaseContainer.onCancel({state:itemState,actions:actions,dispatch:dispatch,field});
+	
+	const onTeamLinkSave = () => {
+		fuLogger.log({level:'TRACE',loc:'ECTeamContainer::onTeamLinkSave',msg:"test"});
+		let errors = utils.validateFormFields(itemState.prefForms.EC_TEAM_PRODUCT_FORM,itemState.inputFields, appPrefs.prefGlobal.LANGUAGES);
+		
+		if (errors.isValid){
+			dispatch(actions.saveTeamLink({state:itemState}));
+		} else {
+			dispatch(actions.setErrors({errors:errors.errorMap}));
+		}
 	}
 	
 	const onOption = (code,item) => {
-		fuLogger.log({level:'TRACE',loc:'ECStoreContainer::onOption',msg:" code "+code});
+		fuLogger.log({level:'TRACE',loc:'ECTeamContainer::onOption',msg:" code "+code});
 		if (BaseContainer.onOptionBase({state:itemState,actions:actions,dispatch:dispatch,code:code,appPrefs:appPrefs,item:item})) {
 			return;
 		}
 		let newPath = location.pathname.substr(0, location.pathname.lastIndexOf("/"));
-		
+		switch(code) {
+			case 'MEMBERS': {
+				newPath = newPath + "/pm-member";
+				navigate(newPath,{state:{parent:item,parentType:"TEAM"}});
+				break;
+			}
+			case 'ROLES': {
+				newPath = newPath + "/pm-role";
+				navigate(newPath,{state:{parent:item,parentType:"TEAM"}});
+				break;
+			}
+			case 'MODIFY_LINK': {
+				if (item.productTeam != null) {
+					dispatch(actions.modifyTeamLink({item,parentType:itemState.parentType,appPrefs:appPrefs}));
+				} else {
+					dispatch(actions.modifyTeamLink({item,parentType:itemState.parentType,appPrefs:appPrefs}));
+				}
+				break;
+			}
+		}
 	}
 	
-	fuLogger.log({level:'TRACE',loc:'ECStoreContainer::render',msg:"Hi there"});
-    if (itemState.view == "MODIFY") {
+	fuLogger.log({level:'TRACE',loc:'ECTeamContainer::render',msg:"Hi there"});
+	if (itemState.view == "MODIFY") {
 		return (
-			<ECStoreModifyView
+			<ECTeamModifyView
 			itemState={itemState}
 			appPrefs={appPrefs}
 			onSave={onSave}
 			onCancel={onCancel}
-			inputChange={inputChange}
-			onBlur={onBlur}/>
+			inputChange={inputChange}/>
+		);
+	} else if (itemState.view == "TEAM_LINK_MODIFY") {
+		return (
+			<ECTeamLinkModifyView
+			itemState={itemState}
+			appPrefs={appPrefs}
+			onSave={onTeamLinkSave}
+			onCancel={onCancel}
+			inputChange={inputChange}/>
 		);
 	} else if (itemState.view == "MAIN" && itemState.items != null) {
 		return (
-			<ECStoreView
+			<ECTeamView 
 			itemState={itemState}
 			appPrefs={appPrefs}
 			onListLimitChange={onListLimitChange}
@@ -106,12 +144,11 @@ function ECStoreContainer({location,navigate}) {
 			goBack={goBack}
 			session={session}
 			/>
+				
 		);
 	} else {
 		return (<div> Loading... </div>);
 	}
- 
 }
 
-
-export default ECStoreContainer;
+export default ECTeamContainer;

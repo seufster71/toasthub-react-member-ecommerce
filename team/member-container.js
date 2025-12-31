@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020 The ToastHub Project
+ * Copyright (C) 2016 The ToastHub Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,14 +16,17 @@
 'use-strict';
 import React, { useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import * as actions from './store-actions';
+import * as actions from './member-actions';
 import fuLogger from '../../../core/common/fu-logger';
-import ECStoreView from '../../../memberView/ecommerce/store/store-view';
-import ECStoreModifyView from '../../../memberView/ecommerce/store/store-modify-view';
+import ECMemberView from '../../../memberView/ec/team/member-view';
+import ECMemberModifyView from '../../../memberView/ec/team/member-modify-view';
+import utils from '../../../core/common/utils';
 import BaseContainer from '../../../core/container/base-container';
+import callService from '../../../core/api/api-call';
 
-function ECStoreContainer({location,navigate}) {
-	const itemState = useSelector((state) => state.ecstore);
+
+function ECMemberContainer({location,navigate}) {
+	const itemState = useSelector((state) => state.pmmember);
 	const session = useSelector((state) => state.session);
 	const appPrefs = useSelector((state) => state.appPrefs);
 	const dispatch = useDispatch();
@@ -55,7 +58,7 @@ function ECStoreContainer({location,navigate}) {
 		BaseContainer.onOrderBy({state:itemState,actions:actions,dispatch:dispatch,appPrefs:appPrefs,field,event});
 	}
 	const onSave = () => {
-		BaseContainer.onSave({state:itemState,actions:actions,dispatch:dispatch,appPrefs:appPrefs,form:"EC_STORE_FORM"});
+		BaseContainer.onSave({state:itemState,actions:actions,dispatch:dispatch,appPrefs:appPrefs,form:"EC_MEMBER_FORM"});
 	}
 	const closeModal = () => {
 		BaseContainer.closeModal({actions:actions,dispatch:dispatch});
@@ -66,33 +69,81 @@ function ECStoreContainer({location,navigate}) {
 	const goBack = () => {
 		BaseContainer.goBack({navigate});
 	}
-	const onBlur = (field) => {
-		BaseContainer.onCancel({state:itemState,actions:actions,dispatch:dispatch,field});
+	
+	const onUserRoleSave = () => {
+		fuLogger.log({level:'TRACE',loc:'ECMemberContainer::onUserRoleSave',msg:"test"});
+		let errors = utils.validateFormFields(itemState.prefForms.ADMIN_USER_ROLE_FORM,itemState.inputFields, appPrefs.prefGlobal.LANGUAGES);
+		
+		if (errors.isValid){
+			//dispatch(memberActions.saveRolePermission({state:itemState}));
+		} else {
+			dispatch(actions.setErrors({errors:errors.errorMap}));
+		}
 	}
 	
 	const onOption = (code,item) => {
-		fuLogger.log({level:'TRACE',loc:'ECStoreContainer::onOption',msg:" code "+code});
-		if (BaseContainer.onOptionBase({state:itemState,actions:actions,dispatch:dispatch,code:code,appPrefs:appPrefs,item:item})) {
-			return;
-		}
-		let newPath = location.pathname.substr(0, location.pathname.lastIndexOf("/"));
+		fuLogger.log({level:'TRACE',loc:'ECMemberContainer::onOption',msg:" code "+code});
+		BaseContainer.onOptionBase({state:itemState,actions:actions,dispatch:dispatch,code:code,appPrefs:appPrefs,item:item})
 		
+		let newPath = location.pathname.substr(0, location.pathname.lastIndexOf("/"));
+		switch(code) {
+			case 'ROLES': {
+				newPath = newPath + "/pm-role";
+				navigate(newPath,{state:{parent:item,parentType:"MEMBER",teamId:itemState.parent.id}});
+				break;
+			}
+			case 'MODIFY': {
+				if (item != null) {
+		//			dispatch(actions.getDefaultOptions({field:"EC_MEMBER_FORM_USERNAME",item:item}));
+				}
+			}
+		}
 	}
 	
-	fuLogger.log({level:'TRACE',loc:'ECStoreContainer::render',msg:"Hi there"});
-    if (itemState.view == "MODIFY") {
+	const loadOptions = (inputValue,callback,name) => {
+		fuLogger.log({level:'TRACE',loc:'ECMemberContainer::loadOptions',msg:" value "+inputValue});
+		let requestParams = {};
+	    requestParams.action = "SELECTLIST";
+	    requestParams.service = "EC_MEMBER_SVC";
+	    requestParams.fieldName = name;
+	    requestParams.searchValue = inputValue;
+	    let params = {};
+	    params.requestParams = requestParams;
+	    params.URI = '/api/member/callService';
+
+	    return callService(params).then( (responseJson) => {
+	    	if (responseJson != null && responseJson.protocalError == null){
+				let list = [];
+				if (responseJson.params.items != null) {
+					let items = responseJson.params.items;
+					for (let i = 0; i < items.length; i++) {
+						let label = items[i].firstname + " " + items[i].middlename + " " + items[i].lastname;
+						list.push({"label":label,"value":items[i].id, "extra":items[i].username});
+					}
+				}
+	    		callback(list);
+	    	} else {
+	    		actionUtils.checkConnectivity(responseJson,dispatch);
+	    	}
+	    }).catch(error => {
+	    	throw(error);
+	    });
+	}
+	
+	fuLogger.log({level:'TRACE',loc:'ECMemberContainer::render',msg:"Hi there"});
+	if (itemState.view == "MODIFY") {
 		return (
-			<ECStoreModifyView
+			<ECMemberModifyView
 			itemState={itemState}
 			appPrefs={appPrefs}
 			onSave={onSave}
 			onCancel={onCancel}
 			inputChange={inputChange}
-			onBlur={onBlur}/>
+			loadOptions={loadOptions}/>
 		);
 	} else if (itemState.view == "MAIN" && itemState.items != null) {
 		return (
-			<ECStoreView
+			<ECMemberView 
 			itemState={itemState}
 			appPrefs={appPrefs}
 			onListLimitChange={onListLimitChange}
@@ -106,12 +157,11 @@ function ECStoreContainer({location,navigate}) {
 			goBack={goBack}
 			session={session}
 			/>
+				
 		);
 	} else {
 		return (<div> Loading... </div>);
 	}
- 
 }
 
-
-export default ECStoreContainer;
+export default ECMemberContainer;
